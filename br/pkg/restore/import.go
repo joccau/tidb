@@ -401,7 +401,7 @@ func (importer *FileImporter) ImportKVFiles(
 		logutil.Key("endKey", endKey))
 
 	// This RetryState will retry 48 time, for 5 min - 6 min.
-	rs := utils.InitialRetryState(48, 100*time.Millisecond, 8*time.Second)
+	rs := utils.InitialRetryState(120, 100*time.Millisecond, 60*time.Second)
 	ctl := OverRegionsInRange(startKey, endKey, importer.metaClient, &rs)
 	err = ctl.Run(ctx, func(ctx context.Context, r *split.RegionInfo) RPCResult {
 		return importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
