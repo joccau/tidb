@@ -403,15 +403,23 @@ func (importer *FileImporter) ImportKVFiles(
 	// This RetryState will retry 48 time, for 5 min - 6 min.
 	rs := utils.InitialRetryState(48, 100*time.Millisecond, 8*time.Second)
 	ctl := OverRegionsInRange(startKey, endKey, importer.metaClient, &rs)
+
+	rm := make(map[uint64]int)
 	err = ctl.Run(ctx, func(ctx context.Context, r *split.RegionInfo) RPCResult {
+		if _, exist := rm[r.Region.Id]; exist {
+			rm[r.Leader.Id]++
+		} else {
+			rm[r.Leader.Id] = 1
+		}
 		return importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
 	})
 
-	log.Debug("download and apply file done",
+	log.Info("download and apply file done",
 		zap.String("file", file.Path),
 		zap.Stringer("take", time.Since(startTime)),
 		logutil.Key("fileStart", file.StartKey),
 		logutil.Key("fileEnd", file.EndKey),
+		zap.Any("regionInvolved", rm),
 	)
 	return errors.Trace(err)
 }

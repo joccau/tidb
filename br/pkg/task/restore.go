@@ -60,7 +60,7 @@ const (
 	FlagStreamFullBackupStorage = "full-backup-storage"
 
 	defaultRestoreConcurrency       = 128
-	defaultRestoreStreamConcurrency = 16
+	defaultRestoreStreamConcurrency = 256
 	maxRestoreBatchSizeLimit        = 10240
 	defaultPDConcurrency            = 1
 	defaultBatchFlushInterval       = 16 * time.Second
