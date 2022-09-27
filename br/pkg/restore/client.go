@@ -1902,8 +1902,9 @@ func (rc *Client) RestoreKVFiles(
 	skipFile := 0
 	deleteFiles := make([]*backuppb.DataFileInfo, 0)
 
-	applyFunc := func(file *backuppb.DataFileInfo) {
+	applyFunc := func(i int, file *backuppb.DataFileInfo) {
 		// get rewrite rule from table id
+		ectx := logutil.ContextWithField(ectx, zap.Int("id", i))
 		rule, ok := rules[file.TableId]
 		if !ok {
 			// TODO handle new created table
@@ -1921,7 +1922,7 @@ func (rc *Client) RestoreKVFiles(
 					onProgress()
 					updateStats(uint64(file.NumberOfEntries), file.Length)
 					summary.CollectInt("File", 1)
-					log.Info("import files done", zap.String("name", file.Path), zap.Duration("take", time.Since(fileStart)))
+					logutil.CL(ectx).Info("import files done", zap.String("name", file.Path), zap.Duration("take", time.Since(fileStart)))
 				}()
 				startTS := rc.startTS
 				if file.Cf == stream.DefaultCF {
@@ -1931,21 +1932,21 @@ func (rc *Client) RestoreKVFiles(
 			})
 		}
 	}
-	for _, file := range files {
+	for i, file := range files {
 		if file.Type == backuppb.FileType_Delete {
 			// collect delete type file and apply it later.
 			deleteFiles = append(deleteFiles, file)
 			continue
 		}
 		fileReplica := file
-		applyFunc(fileReplica)
+		applyFunc(i, fileReplica)
 	}
 	if len(deleteFiles) > 0 {
 		log.Info("restore delete files", zap.Int("count", len(deleteFiles)))
 	}
-	for _, file := range deleteFiles {
+	for i, file := range deleteFiles {
 		fileReplica := file
-		applyFunc(fileReplica)
+		applyFunc(i, fileReplica)
 	}
 	log.Info("total skip files due to table id not matched", zap.Int("count", skipFile))
 	if skipFile > 0 {

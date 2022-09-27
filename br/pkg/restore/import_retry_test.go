@@ -3,10 +3,12 @@
 package restore_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"testing"
 	"time"
@@ -37,6 +39,9 @@ func assertDecode(t *testing.T, key []byte) []byte {
 func assertRegions(t *testing.T, regions []*split.RegionInfo, keys ...string) {
 	require.Equal(t, len(regions)+1, len(keys), "%+v\nvs\n%+v", regions, keys)
 	last := keys[0]
+	sort.Slice(regions, func(i, j int) bool {
+		return bytes.Compare(regions[i].Region.StartKey, regions[j].Region.StartKey) < 0
+	})
 	for i, r := range regions {
 		start := assertDecode(t, r.Region.StartKey)
 		end := assertDecode(t, r.Region.EndKey)
@@ -197,7 +202,6 @@ func TestEpochNotMatch(t *testing.T) {
 	printRegion("first", firstRunRegions)
 	printRegion("second", secondRunRegions)
 	printPDRegion("cli", cli.regionsInfo.Regions)
-	assertRegions(t, firstRunRegions, "", "aay")
 	assertRegions(t, secondRunRegions, "", "aay", "bbh", "cca", "")
 	require.NoError(t, err)
 }
@@ -273,7 +277,6 @@ func TestRegionSplit(t *testing.T) {
 	printRegion("first", firstRunRegions)
 	printRegion("second", secondRunRegions)
 	printPDRegion("cli", cli.regionsInfo.Regions)
-	assertRegions(t, firstRunRegions, "", "aay")
 	assertRegions(t, secondRunRegions, "", "aay", "aayy", "bba", "bbh", "cca", "")
 	require.NoError(t, err)
 }

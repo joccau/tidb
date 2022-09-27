@@ -404,6 +404,8 @@ func (importer *FileImporter) ImportKVFiles(
 	rs := utils.InitialRetryState(48, 100*time.Millisecond, 8*time.Second)
 	ctl := OverRegionsInRange(startKey, endKey, importer.metaClient, &rs)
 	err = ctl.Run(ctx, func(ctx context.Context, r *split.RegionInfo) RPCResult {
+		begin := time.Now()
+		defer logutil.CL(ctx).Info("Running RPC", zap.Stringer("take", time.Since(begin)))
 		return importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
 	})
 

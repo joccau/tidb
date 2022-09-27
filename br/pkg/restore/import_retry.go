@@ -10,12 +10,15 @@ import (
 	"github.com/pingcap/kvproto/pkg/errorpb"
 	"github.com/pingcap/kvproto/pkg/import_sstpb"
 	"github.com/pingcap/kvproto/pkg/metapb"
+	"github.com/pingcap/log"
 	berrors "github.com/pingcap/tidb/br/pkg/errors"
 	"github.com/pingcap/tidb/br/pkg/logutil"
 	"github.com/pingcap/tidb/br/pkg/restore/split"
 	"github.com/pingcap/tidb/br/pkg/utils"
 	"github.com/tikv/client-go/v2/kv"
 	"go.uber.org/multierr"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -128,29 +131,32 @@ func (o *OverRegionsInRangeController) runOverRegions(ctx context.Context, f Reg
 		return o.errors
 	}
 
+	begin := time.Now()
 	// Scan regions covered by the file range
 	regionInfos, errScanRegion := split.PaginateScanRegion(
 		ctx, o.metaClient, o.start, o.end, split.ScanRegionPaginationLimit)
+	logutil.CL(ctx).Info("scanning", zap.Stringer("take", time.Since(begin)))
 	if errScanRegion != nil {
 		return errors.Trace(errScanRegion)
 	}
 
+	eg, cx := errgroup.WithContext(ctx)
 	for _, region := range regionInfos {
-		cont, err := o.runInRegion(ctx, f, region)
-		if err != nil {
-			return err
-		}
-		if !cont {
-			return nil
-		}
+		region := region
+		eg.Go(func() error { return o.runInRegion(cx, f, region) })
+	}
+	err := eg.Wait()
+	if s, ok := err.(*RPCResult); ok && s.StrategyForRetry() != StrategyGiveUp {
+		log.Info("Meet error, retry from beginning.", logutil.ShortError(s))
+		return o.runOverRegions(ctx, f)
 	}
 	return nil
 }
 
 // runInRegion executes the function in the region, and returns `cont = false` if no need for trying for next region.
-func (o *OverRegionsInRangeController) runInRegion(ctx context.Context, f RegionFunc, region *split.RegionInfo) (cont bool, err error) {
+func (o *OverRegionsInRangeController) runInRegion(ctx context.Context, f RegionFunc, region *split.RegionInfo) error {
 	if !o.rs.ShouldRetry() {
-		return false, o.errors
+		return o.errors
 	}
 	result := f(ctx, region)
 
@@ -159,11 +165,11 @@ func (o *OverRegionsInRangeController) runInRegion(ctx context.Context, f Region
 		switch result.StrategyForRetry() {
 		case StrategyGiveUp:
 			logutil.CL(ctx).Warn("unexpected error, should stop to retry", logutil.ShortError(&result), logutil.Region(region.Region))
-			return false, o.errors
+			return o.errors
 		case StrategyFromThisRegion:
 			logutil.CL(ctx).Warn("retry for region", logutil.Region(region.Region), logutil.ShortError(&result))
 			if !o.handleInRegionError(ctx, result, region) {
-				return false, o.runOverRegions(ctx, f)
+				return &result
 			}
 			return o.runInRegion(ctx, f, region)
 		case StrategyFromStart:
@@ -171,10 +177,10 @@ func (o *OverRegionsInRangeController) runInRegion(ctx context.Context, f Region
 			// TODO: make a backoffer considering more about the error info,
 			//       instead of ingore the result and retry.
 			time.Sleep(o.rs.ExponentialBackoff())
-			return false, o.runOverRegions(ctx, f)
+			return &result
 		}
 	}
-	return true, nil
+	return nil
 }
 
 // RPCResult is the result after executing some RPCs to TiKV.
