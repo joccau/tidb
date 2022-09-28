@@ -405,8 +405,9 @@ func (importer *FileImporter) ImportKVFiles(
 	ctl := OverRegionsInRange(startKey, endKey, importer.metaClient, &rs)
 	err = ctl.Run(ctx, func(ctx context.Context, r *split.RegionInfo) RPCResult {
 		begin := time.Now()
-		defer logutil.CL(ctx).Info("Running RPC", zap.Stringer("take", time.Since(begin)))
-		return importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
+		innerErr := importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
+		logutil.CL(ctx).Info("Running RPC", zap.Stringer("take", time.Since(begin)))
+		return innerErr
 	})
 
 	log.Debug("download and apply file done",
