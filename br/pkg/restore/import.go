@@ -406,7 +406,11 @@ func (importer *FileImporter) ImportKVFiles(
 	err = ctl.Run(ctx, func(ctx context.Context, r *split.RegionInfo) RPCResult {
 		begin := time.Now()
 		innerErr := importer.ImportKVFileForRegion(ctx, file, rule, startTS, restoreTS, r)
-		logutil.CL(ctx).Info("Running RPC", zap.Stringer("take", time.Since(begin)))
+		var storeID uint64 = 0
+		if nil != r.Leader {
+			storeID = r.Leader.StoreId
+		}
+		logutil.CL(ctx).Info("Running RPC", zap.Stringer("take", time.Since(begin)), zap.String("file-name", file.Path), zap.Uint64("store-id", storeID))
 		return innerErr
 	})
 
