@@ -1831,38 +1831,39 @@ func (rc *Client) RestoreKVFiles(
 		ctx = opentracing.ContextWithSpan(ctx, span1)
 	}
 
-	eg, ectx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 	skipFile := 0
 	deleteFiles := make([]*backuppb.DataFileInfo, 0)
 
 	applyFunc := func(file *backuppb.DataFileInfo) {
-		// get rewrite rule from table id
-		rule, ok := rules[file.TableId]
-		if !ok {
-			// TODO handle new created table
-			// For this version we do not handle new created table after full backup.
-			// in next version we will perform rewrite and restore meta key to restore new created tables.
-			// so we can simply skip the file that doesn't have the rule here.
-			onProgress()
-			summary.CollectInt("FileSkip", 1)
-			log.Debug("skip file due to table id not matched", zap.String("file", file.Path), zap.Int64("tableId", file.TableId))
-			skipFile++
-		} else {
-			rc.workerPool.ApplyOnErrorGroup(eg, func() error {
-				fileStart := time.Now()
-				defer func() {
-					onProgress()
-					updateStats(uint64(file.NumberOfEntries), file.Length)
-					summary.CollectInt("File", 1)
-					log.Info("import files done", zap.String("name", file.Path), zap.Duration("take", time.Since(fileStart)))
-				}()
-				startTS := rc.startTS
-				if file.Cf == stream.DefaultCF {
-					startTS = rc.shiftStartTS
-				}
-				return rc.fileImporter.ImportKVFiles(ectx, file, rule, startTS, rc.restoreTS)
-			})
-		}
+		log.Info("apply log file", zap.String("log-path", file.Path))
+		// // get rewrite rule from table id
+		// rule, ok := rules[file.TableId]
+		// if !ok {
+		// 	// TODO handle new created table
+		// 	// For this version we do not handle new created table after full backup.
+		// 	// in next version we will perform rewrite and restore meta key to restore new created tables.
+		// 	// so we can simply skip the file that doesn't have the rule here.
+		// 	onProgress()
+		// 	summary.CollectInt("FileSkip", 1)
+		// 	log.Debug("skip file due to table id not matched", zap.String("file", file.Path), zap.Int64("tableId", file.TableId))
+		// 	skipFile++
+		// } else {
+		// 	rc.workerPool.ApplyOnErrorGroup(eg, func() error {
+		// 		fileStart := time.Now()
+		// 		defer func() {
+		// 			onProgress()
+		// 			updateStats(uint64(file.NumberOfEntries), file.Length)
+		// 			summary.CollectInt("File", 1)
+		// 			log.Info("import files done", zap.String("name", file.Path), zap.Duration("take", time.Since(fileStart)))
+		// 		}()
+		// 		startTS := rc.startTS
+		// 		if file.Cf == stream.DefaultCF {
+		// 			startTS = rc.shiftStartTS
+		// 		}
+		// 		return rc.fileImporter.ImportKVFiles(ectx, file, rule, startTS, rc.restoreTS)
+		// 	})
+		// }
 	}
 	for r := files.TryNext(ctx); !r.Finished; r = files.TryNext(ctx) {
 		if r.Err != nil {
