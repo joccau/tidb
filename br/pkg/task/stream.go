@@ -1180,11 +1180,11 @@ func restoreStream(
 		totalKVCount += kvCount
 		totalSize += size
 	}
-	dataFileCount := 0
-	_, err = client.LoadDDLFilesAndCountDMLFiles(ctx, &dataFileCount)
-	if err != nil {
-		return err
-	}
+	dataFileCount := 100
+	// _, err = client.LoadDDLFilesAndCountDMLFiles(ctx, &dataFileCount)
+	// if err != nil {
+	// 	return err
+	// }
 	// pm := g.StartProgress(ctx, "Restore Meta Files", int64(len(ddlFiles)), !cfg.LogProgress)
 	// if err = withProgress(pm, func(p glue.Progress) error {
 	// 	client.RunGCRowsLoader(ctx)
@@ -1209,37 +1209,37 @@ func restoreStream(
 		return errors.Annotate(err, "failed to restore kv files")
 	}
 
-	if err = client.CleanUpKVFiles(ctx); err != nil {
-		return errors.Annotate(err, "failed to clean up")
-	}
+	// if err = client.CleanUpKVFiles(ctx); err != nil {
+	// 	return errors.Annotate(err, "failed to clean up")
+	// }
 
-	if err = client.SaveSchemas(ctx, schemasReplace, logMinTS, cfg.RestoreTS); err != nil {
-		return errors.Trace(err)
-	}
+	// if err = client.SaveSchemas(ctx, schemasReplace, logMinTS, cfg.RestoreTS); err != nil {
+	// 	return errors.Trace(err)
+	// }
 
-	if err = client.InsertGCRows(ctx); err != nil {
-		return errors.Annotate(err, "failed to insert rows into gc_delete_range")
-	}
+	// if err = client.InsertGCRows(ctx); err != nil {
+	// 	return errors.Annotate(err, "failed to insert rows into gc_delete_range")
+	// }
 
-	if cfg.tiflashRecorder != nil {
-		sqls := cfg.tiflashRecorder.GenerateAlterTableDDLs(mgr.GetDomain().InfoSchema())
-		log.Info("Generating SQLs for restoring TiFlash Replica",
-			zap.Strings("sqls", sqls))
-		err = g.UseOneShotSession(mgr.GetStorage(), false, func(se glue.Session) error {
-			for _, sql := range sqls {
-				if errExec := se.ExecuteInternal(ctx, sql); errExec != nil {
-					logutil.WarnTerm("Failed to restore tiflash replica config, you may execute the sql restore it manually.",
-						logutil.ShortError(errExec),
-						zap.String("sql", sql),
-					)
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	}
+	// if cfg.tiflashRecorder != nil {
+	// 	sqls := cfg.tiflashRecorder.GenerateAlterTableDDLs(mgr.GetDomain().InfoSchema())
+	// 	log.Info("Generating SQLs for restoring TiFlash Replica",
+	// 		zap.Strings("sqls", sqls))
+	// 	err = g.UseOneShotSession(mgr.GetStorage(), false, func(se glue.Session) error {
+	// 		for _, sql := range sqls {
+	// 			if errExec := se.ExecuteInternal(ctx, sql); errExec != nil {
+	// 				logutil.WarnTerm("Failed to restore tiflash replica config, you may execute the sql restore it manually.",
+	// 					logutil.ShortError(errExec),
+	// 					zap.String("sql", sql),
+	// 				)
+	// 			}
+	// 		}
+	// 		return nil
+	// 	})
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
