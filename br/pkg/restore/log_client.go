@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pingcap/errors"
 	backuppb "github.com/pingcap/kvproto/pkg/brpb"
@@ -152,6 +153,7 @@ func (rc *logFileManager) createMetaIterOver(ctx context.Context, s storage.Exte
 	}
 	namesIter := iter.FromSlice(names)
 	readMeta := func(ctx context.Context, name string) (*backuppb.Metadata, error) {
+		time.Sleep(time.Second)
 		f, err := s.ReadFile(ctx, name)
 		if err != nil {
 			return nil, errors.Annotatef(err, "failed during reading file %s", name)
