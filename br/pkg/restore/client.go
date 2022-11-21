@@ -1866,6 +1866,7 @@ func (rc *Client) RestoreKVFiles(
 	}
 	for r := files.TryNext(ctx); !r.Finished; r = files.TryNext(ctx) {
 		if r.Err != nil {
+			log.Info("try next faild", zap.String("ERR", r.Err.Error()))
 			return err
 		}
 		file := r.Item

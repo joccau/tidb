@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	readMetaConcurrency = 128
-	readMetaBatchSize   = 512
+	readMetaConcurrency = 4
+	readMetaBatchSize   = 1024
 )
 
 // MetaIter is the type of iterator of metadata files' content.
